@@ -9,7 +9,121 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      exams: {
+        Row: {
+          created_at: string
+          id: string
+          identifier: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          identifier: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          identifier?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      personal_progress: {
+        Row: {
+          id: string
+          last_updated: string
+          notes: string | null
+          question_id: string
+          solved: boolean
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          last_updated?: string
+          notes?: string | null
+          question_id: string
+          solved?: boolean
+          user_id: string
+        }
+        Update: {
+          id?: string
+          last_updated?: string
+          notes?: string | null
+          question_id?: string
+          solved?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personal_progress_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      questions: {
+        Row: {
+          created_at: string
+          exam_id: string
+          id: string
+          question_number: number
+          tags: string[]
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          exam_id: string
+          id?: string
+          question_number: number
+          tags?: string[]
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          exam_id?: string
+          id?: string
+          question_number?: number
+          tags?: string[]
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questions_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

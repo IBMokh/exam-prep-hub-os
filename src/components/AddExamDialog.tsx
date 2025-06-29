@@ -6,39 +6,59 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Calendar } from 'lucide-react';
 import { Exam } from '@/types';
-import { saveExam, validateExamIdentifier, isExamIdentifierUnique } from '@/lib/storage';
 
 interface AddExamDialogProps {
   onExamSaved: (exam: Exam) => void;
+  saveExam: (exam: { identifier: string }) => Promise<Exam>;
+  validateExamIdentifier: (identifier: string) => boolean;
+  isExamIdentifierUnique: (identifier: string) => Promise<boolean>;
 }
 
-const AddExamDialog = ({ onExamSaved }: AddExamDialogProps) => {
+const AddExamDialog = ({ 
+  onExamSaved, 
+  saveExam, 
+  validateExamIdentifier, 
+  isExamIdentifierUnique 
+}: AddExamDialogProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [identifier, setIdentifier] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
     
     if (!identifier.trim()) {
       setError('Exam identifier is required');
+      setLoading(false);
       return;
     }
 
     if (!validateExamIdentifier(identifier)) {
       setError('Invalid format. Use format: YYYYXX (e.g., 2023AA)');
+      setLoading(false);
       return;
     }
 
-    if (!isExamIdentifierUnique(identifier)) {
-      setError('This exam identifier already exists');
-      return;
-    }
+    try {
+      const isUnique = await isExamIdentifierUnique(identifier);
+      if (!isUnique) {
+        setError('This exam identifier already exists');
+        setLoading(false);
+        return;
+      }
 
-    const savedExam = saveExam({ identifier: identifier.toUpperCase() });
-    onExamSaved(savedExam);
-    handleClose();
+      const savedExam = await saveExam({ identifier: identifier.toUpperCase() });
+      onExamSaved(savedExam);
+      handleClose();
+    } catch (error) {
+      console.error('Error saving exam:', error);
+      setError('Failed to save exam. Please try again.');
+    }
+    
+    setLoading(false);
   };
 
   const handleClose = () => {
@@ -83,8 +103,12 @@ const AddExamDialog = ({ onExamSaved }: AddExamDialogProps) => {
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-              Add Exam
+            <Button 
+              type="submit" 
+              className="bg-blue-600 hover:bg-blue-700"
+              disabled={loading}
+            >
+              {loading ? 'Adding...' : 'Add Exam'}
             </Button>
           </div>
         </form>
