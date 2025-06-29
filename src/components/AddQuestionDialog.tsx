@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Plus, X } from 'lucide-react';
 import { Question, Exam } from '@/types';
-import { saveQuestion, updateQuestion } from '@/lib/storage';
+import { saveQuestion, updateQuestion } from '@/lib/supabase';
 
 interface AddQuestionDialogProps {
   availableExams: Exam[];
@@ -31,14 +30,34 @@ const AddQuestionDialog = ({
   const [type, setType] = useState<'multiple-choice' | 'open-answer'>(editingQuestion?.type || 'multiple-choice');
   const [selectedTags, setSelectedTags] = useState<string[]>(editingQuestion?.tags || []);
   const [newTag, setNewTag] = useState('');
+  const [filteredTags, setFilteredTags] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Filter available tags based on what's already selected and search input
+  useEffect(() => {
+    const filtered = availableTags.filter(tag => 
+      !selectedTags.includes(tag) && 
+      tag.toLowerCase().includes(newTag.toLowerCase())
+    );
+    setFilteredTags(filtered);
+  }, [availableTags, selectedTags, newTag]);
+
+  // Open dialog when editing a question
+  useEffect(() => {
+    if (editingQuestion) {
+      setIsOpen(true);
+    }
+  }, [editingQuestion]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!examId || !questionNumber) {
       alert('Please fill in all required fields');
       return;
     }
+
+    setLoading(true);
 
     const questionData = {
       examId,
@@ -47,16 +66,23 @@ const AddQuestionDialog = ({
       tags: selectedTags
     };
 
-    let savedQuestion: Question;
-    
-    if (editingQuestion) {
-      savedQuestion = updateQuestion(editingQuestion.id, questionData)!;
-    } else {
-      savedQuestion = saveQuestion(questionData);
-    }
+    try {
+      let savedQuestion: Question;
+      
+      if (editingQuestion) {
+        savedQuestion = await updateQuestion({ ...editingQuestion, ...questionData });
+      } else {
+        savedQuestion = await saveQuestion(questionData);
+      }
 
-    onQuestionSaved(savedQuestion);
-    handleClose();
+      onQuestionSaved(savedQuestion);
+      handleClose();
+    } catch (error) {
+      console.error('Error saving question:', error);
+      alert('Error saving question. Please try again.');
+    }
+    
+    setLoading(false);
   };
 
   const handleClose = () => {
@@ -71,8 +97,9 @@ const AddQuestionDialog = ({
   };
 
   const handleTagAdd = () => {
-    if (newTag.trim() && !selectedTags.includes(newTag.trim())) {
-      setSelectedTags([...selectedTags, newTag.trim()]);
+    const tagToAdd = newTag.trim().toLowerCase();
+    if (tagToAdd && !selectedTags.includes(tagToAdd)) {
+      setSelectedTags([...selectedTags, tagToAdd]);
       setNewTag('');
     }
   };
@@ -87,6 +114,13 @@ const AddQuestionDialog = ({
     }
   };
 
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleTagAdd();
+    }
+  };
+
   return (
     <Dialog open={isOpen || !!editingQuestion} onOpenChange={setIsOpen}>
       {!editingQuestion && (
@@ -97,7 +131,7 @@ const AddQuestionDialog = ({
           </Button>
         </DialogTrigger>
       )}
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {editingQuestion ? 'Edit Question' : 'Add New Question'}
@@ -161,31 +195,59 @@ const AddQuestionDialog = ({
               ))}
             </div>
             
-            <div className="flex gap-2 mb-2">
-              <Input
-                value={newTag}
-                onChange={(e) => setNewTag(e.target.value)}
-                placeholder="Add new tag"
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleTagAdd())}
-              />
-              <Button type="button" variant="outline" onClick={handleTagAdd}>
-                Add
-              </Button>
-            </div>
-            
-            <div className="flex flex-wrap gap-1">
-              {availableTags
-                .filter(tag => !selectedTags.includes(tag))
-                .map((tag) => (
-                  <Badge
-                    key={tag}
-                    variant="outline"
-                    className="cursor-pointer hover:bg-blue-50"
-                    onClick={() => handleExistingTagAdd(tag)}
-                  >
-                    + {tag}
-                  </Badge>
-                ))}
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Input
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  placeholder="Add or search for tags"
+                  onKeyPress={handleKeyPress}
+                />
+                <Button type="button" variant="outline" onClick={handleTagAdd}>
+                  Add
+                </Button>
+              </div>
+              
+              {/* Existing tags suggestions */}
+              {newTag && filteredTags.length > 0 && (
+                <div className="border rounded-md p-2 max-h-32 overflow-y-auto">
+                  <p className="text-xs text-gray-500 mb-1">Existing tags:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {filteredTags.slice(0, 10).map((tag) => (
+                      <Badge
+                        key={tag}
+                        variant="outline"
+                        className="cursor-pointer hover:bg-blue-50 text-xs"
+                        onClick={() => handleExistingTagAdd(tag)}
+                      >
+                        + {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Show some popular existing tags when input is empty */}
+              {!newTag && availableTags.length > 0 && (
+                <div className="border rounded-md p-2">
+                  <p className="text-xs text-gray-500 mb-1">Popular tags:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {availableTags
+                      .filter(tag => !selectedTags.includes(tag))
+                      .slice(0, 10)
+                      .map((tag) => (
+                        <Badge
+                          key={tag}
+                          variant="outline"
+                          className="cursor-pointer hover:bg-blue-50 text-xs"
+                          onClick={() => handleExistingTagAdd(tag)}
+                        >
+                          + {tag}
+                        </Badge>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -193,8 +255,12 @@ const AddQuestionDialog = ({
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-              {editingQuestion ? 'Update' : 'Add'} Question
+            <Button 
+              type="submit" 
+              className="bg-blue-600 hover:bg-blue-700"
+              disabled={loading}
+            >
+              {loading ? 'Saving...' : (editingQuestion ? 'Update' : 'Add')} Question
             </Button>
           </div>
         </form>

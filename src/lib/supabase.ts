@@ -11,7 +11,7 @@ export const getExams = async (): Promise<Exam[]> => {
   
   if (error) {
     console.error('Error fetching exams:', error);
-    return [];
+    throw error;
   }
   
   return data.map(exam => ({
@@ -48,7 +48,7 @@ export const getQuestions = async (): Promise<Question[]> => {
   
   if (error) {
     console.error('Error fetching questions:', error);
-    return [];
+    throw error;
   }
   
   return data.map(question => ({
@@ -131,7 +131,7 @@ export const getPersonalProgress = async (userId: string): Promise<PersonalProgr
   
   if (error) {
     console.error('Error fetching personal progress:', error);
-    return [];
+    throw error;
   }
   
   return data.map(progress => ({
@@ -156,7 +156,7 @@ export const updatePersonalProgress = async (userId: string, progress: PersonalP
   if (error) throw error;
 };
 
-// Utility functions
+// Global Tags Management
 export const getAllTags = async (): Promise<string[]> => {
   const { data, error } = await supabase
     .from('questions')
@@ -164,19 +164,32 @@ export const getAllTags = async (): Promise<string[]> => {
   
   if (error) {
     console.error('Error fetching tags:', error);
-    return [];
+    throw error;
   }
   
+  // Extract all unique tags from all questions
   const allTags = new Set<string>();
   data.forEach(question => {
-    if (question.tags) {
-      question.tags.forEach((tag: string) => allTags.add(tag));
+    if (question.tags && Array.isArray(question.tags)) {
+      question.tags.forEach((tag: string) => {
+        if (tag && tag.trim()) {
+          allTags.add(tag.trim().toLowerCase());
+        }
+      });
     }
   });
   
   return Array.from(allTags).sort();
 };
 
+// Add a new tag to the global pool by creating a question with it
+export const addGlobalTag = async (tag: string): Promise<void> => {
+  // Tags are automatically added to the global pool when questions are saved with them
+  // This function is mainly for consistency, but the real addition happens when saving questions
+  console.log(`Tag "${tag}" will be added to global pool when used in a question`);
+};
+
+// Utility functions
 export const validateExamIdentifier = (identifier: string): boolean => {
   const regex = /^\d{4}[A-Z]{2}$/;
   return regex.test(identifier);

@@ -90,12 +90,14 @@ const Index = () => {
   };
 
   const handleQuestionSaved = () => {
-    loadData();
+    loadData(); // Reload all data including tags
     setEditingQuestion(undefined);
   };
 
   const handleQuestionDelete = (questionId: string) => {
     setQuestions(prev => prev.filter(q => q.id !== questionId));
+    // Reload tags since deleting a question might affect the global tag list
+    loadData();
   };
 
   const handleExamSaved = () => {
